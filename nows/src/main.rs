@@ -1,66 +1,108 @@
-use std::{fs, io};
-use std::path::PathBuf;
+use std::{io};
+use std::str::FromStr;
 use nostr_sdk::{Client, Keys};
+use nostr_sdk::async_utility::tokio;
 use nostr_sdk::hashes::hex::{Case, DisplayHex};
-use encryption::encrypt_data;
+use encryption::{decrypt_from_string, encrypt_data};
+use nows::{create_file, find_first_file, get_or_create_app_dir, read_key, AccountFile};
 
-fn main() {
-    // let keys: Keys = Keys::parse("".trim()).unwrap();
-    // let client = Client::new(keys);
-    //
-    // client.add_relay()
-    // io::stdout().flush()?;
+#[tokio::main]
+async fn main() {
+    let app_storage_dir = dirs::data_local_dir()
+        .expect("Could not find local data directory")
+        .to_string_lossy()
+        .to_string();
+    if let Some(key_file) = find_first_file(&format!("{app_storage_dir}/nows/storage/")) {
+        // println!("Account already exists: {key_file}");
+        // println!("At the moment nowster supports only one user on local machine.");
+        // //todo: impl this feature below
+        // // println!("Run `nows --remove <your_pubkey>` to delete the account");
 
-    println!("GM! what's your private key?");
-    print!("Priv key: ");
-    let mut priv_key = String::new();
-    let _ = io::stdin().read_line(&mut priv_key);
-    priv_key = priv_key.trim().to_string();
+        // positive path:
+        // 0. ask for password if required (Optional)
+        // 1. decrypt the key
+        // 2. load latest 5 notes
+        // 3. hit SPACE to load another 5
 
-    println!("You can use password for additional security of key derivation.\nIf you add it, \
-    then everytime you run the program, you have to type this password also. For no password, press ENTER");
-    let mut master_password = String::new();
-    let _ = io::stdin().read_line(&mut master_password);
-    master_password = master_password.trim().to_string();
+        // // Decrypt the user's password (string)
+        println!("Type your password if required");
+        let mut typed_password = String::new();
+        let _ = io::stdin().read_line(&mut typed_password);
+        typed_password = typed_password.trim().to_string();
+        let mut password = None;
+        if !typed_password.is_empty() {
+            password = Some(typed_password);
+        }
 
-    println!("---");
+        // println!("file to read: {:?}", &key_file);
 
-    // // Encrypt the user's password
-    println!("Step 1. Encrypting password string...");
-    let encrypted_payload = encrypt_data(
-        priv_key.as_bytes(),
-        Some(master_password.as_bytes())
-    ).expect("Encryption failed");
+        let encrypted_key = read_key("/nows/storage/", &key_file)
+            .expect("Could not read master password");
+        let decrypted_key = decrypt_from_string(
+            &encrypted_key,
+            password,
+        ).expect("Decryption failed");
 
-    println!("Encryption successful.");
-    println!(
-        "  Ciphertext length: {}",
-        encrypted_payload.ciphertext.len()
-    );
+        println!("Decryption successful.");
+        println!("---");
 
-    println!("---");
-    println!("Step 2. Storing encrypted data...");
-    let storage = get_or_create_app_dir("nows/storage").expect("Failed to create app dir");
-    let keys = Keys::parse(priv_key.as_str());
-    let pubkey = keys.expect("Failed to parse keys").public_key;
-    create_file(
-        storage,
-        pubkey.to_string().as_str(),
-        AccountFile { encrypted_key: encrypted_payload.ciphertext.to_hex_string(Case::Lower) })
-        .expect("Failed to create key file");
+    //     nostr
+    //     let keys = Keys::parse(decrypted_key.as_str());
+        let keys = Keys::from_str(&decrypted_key);
+        let client = Client::new(keys.unwrap());
 
-    // // Decrypt the user's password (string)
-    // println!("Decrypting password string with correct master password...");
-    // let decrypted_password_string = decrypt_password_string(
-    //     &encrypted_payload,
-    //     master_password_for_derivation.as_bytes(),
-    // )
-    // .expect("Decryption failed");
-    //
-    // println!("Decryption successful.");
-    // println!("Decrypted string: \"{}\"", decrypted_password_string);
-    // assert_eq!(user_password_to_encrypt, decrypted_password_string);
-    // println!("---");
+        let _ = client.add_relay("wss://relay.damus.io").await;
+        client.connect().await;
+
+
+    } else {
+        // negative path:
+        // 1. ask user about his key and password
+        // 2. encrypt and save
+        // 3. go to positive path
+
+        println!("GM! what's your private key?");
+        print!("Priv key: ");
+        let mut priv_key = String::new();
+        let _ = io::stdin().read_line(&mut priv_key);
+        priv_key = priv_key.trim().to_string();
+        let keys = Keys::parse(priv_key.as_str());
+        let pubkey = keys.expect("Failed to parse keys").public_key;
+
+        println!("You can use password for additional security of key derivation.\nIf you add it, \
+    then everytime you run the program, you have to type this password. For no password, press ENTER");
+        let mut master_password = String::new();
+        let _ = io::stdin().read_line(&mut master_password);
+        master_password = master_password.trim().to_string();
+
+        println!("---");
+
+        // // Encrypt the user's password
+        println!("Step 1. Encrypting password string...");
+        let encrypted_payload = encrypt_data(
+            priv_key.as_bytes(),
+            Some(master_password.as_bytes())
+        ).expect("Encryption failed");
+
+        println!("Encryption successful.");
+        println!(
+            "  Ciphertext length: {}",
+            encrypted_payload.ciphertext.len()
+        );
+
+        println!("---");
+        println!("Step 2. Storing encrypted data...");
+        let storage = get_or_create_app_dir("nows/storage").expect("Failed to create app dir");
+        create_file(
+            storage,
+            pubkey.to_string().as_str(),
+            AccountFile::new(encrypted_payload.ciphertext.to_hex_string(Case::Lower).as_str()))
+            .expect("Failed to create key file");
+    }
+
+
+
+
     //
     // // Test decryption failure with wrong master password
     // println!("Attempting decryption with WRONG master password...");
@@ -102,31 +144,4 @@ fn main() {
     // println!("---");
     //
     // println!("All tests passed!");
-}
-
-fn get_or_create_app_dir(dir_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let app_dir = dirs::data_local_dir()
-        .map(|pb| pb.join(dir_name))
-        .ok_or("Could not determine local data directory")?;
-
-    // Create directory if it doesn't exist
-    fs::create_dir_all(&app_dir)?;
-
-    Ok(app_dir)
-}
-
-fn create_file(
-    app_dir: PathBuf,
-    file_name: &str,
-    content: AccountFile,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = app_dir.join(file_name);
-    fs::write(&file_path, content.encrypted_key)?;
-
-    println!("Created key file: {}", file_path.display());
-    Ok(())
-}
-
-struct AccountFile {
-    encrypted_key: String,
 }

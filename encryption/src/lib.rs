@@ -220,6 +220,25 @@ where
     Ok(decrypted_bytes)
 }
 
+
+/// Convenience function to decrypt data from String and convert it to a String.
+pub fn decrypt_from_string<P>(
+    encrypted_key: &str,
+    master_password: Option<P>,
+) -> Result<String, Error>
+where
+    P: AsRef<[u8]>,
+{
+    let nonce_bytes = [0u8; NONCE_SIZE];
+    let encrypted_payload = EncryptedPayload {
+        ciphertext: encrypted_key.as_bytes().to_vec(),
+        salt: HARDCODED_SALT, // TODO
+        nonce: nonce_bytes,
+        log_n: SCRYPT_LOG_N,
+    };
+    decrypt_password_string(&encrypted_payload, master_password)
+}
+
 /// Convenience function to decrypt data and convert it to a String.
 pub fn decrypt_password_string<P>(
     encrypted_payload: &EncryptedPayload,
