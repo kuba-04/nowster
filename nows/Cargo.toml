@@ -1,0 +1,9 @@
+[package]
+name = "nows"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nostr-sdk = "0.42"
+encryption = {path = "../encryption"}
+dirs = "6.0.0"
