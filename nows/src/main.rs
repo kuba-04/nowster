@@ -3,9 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use nostr_sdk::{Client, Filter, Keys};
 use nostr_sdk::async_utility::tokio;
-use nostr_sdk::hashes::hex::{Case, DisplayHex};
-use nostr_sdk::TagKind::File;
-use encryption::{decrypt_from_string, encrypt_data, encrypt_to_string};
+use encryption::{decrypt_from_string, encrypt_to_string};
 use nows::{create_file, find_first_file, get_or_create_app_dir, read_key, AccountFile};
 
 #[tokio::main]

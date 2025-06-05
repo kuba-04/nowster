@@ -24,23 +24,10 @@ const HARDCODED_SALT: [u8; SALT_SIZE] = [
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum KeySecurity {
+enum KeySecurity {
     Low = 0,
     Medium = 1,
     High = 2,
-}
-
-impl KeySecurity {
-    /// Tries to convert a u8 value back to KeySecurity.
-    #[allow(dead_code)] // Potentially useful for deserialization
-    pub fn from_u8(value: u8) -> Result<Self, Error> {
-        match value {
-            0 => Ok(KeySecurity::Low),
-            1 => Ok(KeySecurity::Medium),
-            2 => Ok(KeySecurity::High),
-            _ => Err(Error::InvalidKeySecurityValue(value)),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -54,7 +41,7 @@ pub enum Error {
 
 /// Specific errors from scrypt.
 #[derive(Debug)]
-pub enum ScryptDerivationError {
+enum ScryptDerivationError {
     InvalidParams(scrypt::errors::InvalidParams),
     InvalidOutputLen(scrypt::errors::InvalidOutputLen),
 }
@@ -123,11 +110,23 @@ impl From<std::string::FromUtf8Error> for Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct EncryptedPayload {
-    pub ciphertext: Vec<u8>,
-    pub salt: [u8; SALT_SIZE],   // Salt used for key derivation
-    pub nonce: [u8; NONCE_SIZE], // Nonce used for encryption
-    pub log_n: u8,               // Scrypt log_n parameter used
+struct EncryptedPayload {
+    ciphertext: Vec<u8>,
+    salt: [u8; SALT_SIZE],   // Salt used for key derivation
+    nonce: [u8; NONCE_SIZE], // Nonce used for encryption
+    log_n: u8,               // Scrypt log_n parameter used
+}
+
+/// Converts encrypted data to a base64-encoded string for storage or transmission
+pub fn encrypt_to_string<P>(
+    plaintext_data: &[u8],
+    master_password: Option<P>,
+) -> Result<String, Error>
+where
+    P: AsRef<[u8]>,
+{
+    let encrypted = encrypt_data(plaintext_data, master_password)?;
+    Ok(BASE64.encode(encrypted.ciphertext))
 }
 
 // user has option to use master password or not
@@ -153,7 +152,7 @@ where
 }
 
 /// Encrypts plaintext data using a master password.
-pub fn encrypt_data<P>(
+fn encrypt_data<P>(
     plaintext_data: &[u8],
     master_password: Option<P>,
 ) -> Result<EncryptedPayload, Error>
@@ -193,8 +192,43 @@ where
     })
 }
 
+/// Convenience function to decrypt data from String and convert it to a String.
+pub fn decrypt_from_string<P>(
+    encrypted_base64: &str,
+    master_password: Option<P>,
+) -> Result<String, Error>
+where
+    P: AsRef<[u8]>,
+{
+    // Decode the base64 string back into bytes
+    let ciphertext = BASE64
+        .decode(encrypted_base64)
+        .map_err(|_| Error::InvalidSecretKeyData("Invalid base64 encoding".to_string()))?;
+
+    let nonce_bytes = [0u8; NONCE_SIZE];
+    let encrypted_payload = EncryptedPayload {
+        ciphertext,
+        salt: HARDCODED_SALT,
+        nonce: nonce_bytes,
+        log_n: SCRYPT_LOG_N,
+    };
+    decrypt_password_string(&encrypted_payload, master_password)
+}
+
+/// Convenience function to decrypt data and convert it to a String.
+fn decrypt_password_string<P>(
+    encrypted_payload: &EncryptedPayload,
+    master_password: Option<P>,
+) -> Result<String, Error>
+where
+    P: AsRef<[u8]>,
+{
+    let decrypted_bytes = decrypt_data(encrypted_payload, master_password)?;
+    String::from_utf8(decrypted_bytes).map_err(Error::from)
+}
+
 /// Decrypts an `EncryptedPayload` to recover the original plaintext data as bytes.
-pub fn decrypt_data<P>(
+fn decrypt_data<P>(
     encrypted_payload: &EncryptedPayload,
     master_password: Option<P>,
 ) -> Result<Vec<u8>, Error>
@@ -226,49 +260,13 @@ where
     Ok(decrypted_bytes)
 }
 
-/// Convenience function to decrypt data from String and convert it to a String.
-pub fn decrypt_from_string<P>(
-    encrypted_base64: &str,
-    master_password: Option<P>,
-) -> Result<String, Error>
-where
-    P: AsRef<[u8]>,
-{
-    // Decode the base64 string back into bytes
-    let ciphertext = BASE64
-        .decode(encrypted_base64)
-        .map_err(|_| Error::InvalidSecretKeyData("Invalid base64 encoding".to_string()))?;
-
-    let nonce_bytes = [0u8; NONCE_SIZE];
-    let encrypted_payload = EncryptedPayload {
-        ciphertext,
-        salt: HARDCODED_SALT,
-        nonce: nonce_bytes,
-        log_n: SCRYPT_LOG_N,
-    };
-    decrypt_password_string(&encrypted_payload, master_password)
-}
-
-/// Convenience function to decrypt data and convert it to a String.
-pub fn decrypt_password_string<P>(
-    encrypted_payload: &EncryptedPayload,
-    master_password: Option<P>,
-) -> Result<String, Error>
-where
-    P: AsRef<[u8]>,
-{
-    let decrypted_bytes = decrypt_data(encrypted_payload, master_password)?;
-    String::from_utf8(decrypted_bytes).map_err(Error::from)
-}
-
 // --- SecretKey specific logic (analogous to the snippet) ---
-
 /// A minimal representation of a secret key (e.g., for ECC).
 #[derive(Clone)]
-pub struct SecretKey([u8; 32]); // Typically 32 bytes for curves like secp256k1
+struct SecretKey([u8; 32]); // Typically 32 bytes for curves like secp256k1
 
 impl SecretKey {
-    pub fn from_slice(bytes: &[u8]) -> Result<Self, String> {
+    fn from_slice(bytes: &[u8]) -> Result<Self, String> {
         // Returns String error for simplicity
         if bytes.len() == KEY_SIZE {
             // Assuming SecretKey is also KEY_SIZE
@@ -286,7 +284,7 @@ impl SecretKey {
         }
     }
 
-    pub fn as_bytes(&self) -> &[u8; KEY_SIZE] {
+    fn as_bytes(&self) -> &[u8; KEY_SIZE] {
         &self.0
     }
 }
@@ -295,16 +293,4 @@ impl std::fmt::Debug for SecretKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SecretKey([REDACTED {} bytes])", self.0.len())
     }
-}
-
-/// Converts encrypted data to a base64-encoded string for storage or transmission
-pub fn encrypt_to_string<P>(
-    plaintext_data: &[u8],
-    master_password: Option<P>,
-) -> Result<String, Error>
-where
-    P: AsRef<[u8]>,
-{
-    let encrypted = encrypt_data(plaintext_data, master_password)?;
-    Ok(BASE64.encode(encrypted.ciphertext))
 }
