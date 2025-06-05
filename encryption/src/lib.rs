@@ -1,5 +1,7 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chacha20poly1305::{
-    aead::{Aead, KeyInit, Payload as AeadPayload}, Key as ChaChaKey, XChaCha20Poly1305, XNonce,
+    aead::{Aead, KeyInit, Payload as AeadPayload},
+    Key as ChaChaKey, XChaCha20Poly1305, XNonce,
 };
 use scrypt;
 
@@ -123,13 +125,17 @@ impl From<std::string::FromUtf8Error> for Error {
 #[derive(Debug, Clone)]
 pub struct EncryptedPayload {
     pub ciphertext: Vec<u8>,
-    pub salt: [u8; SALT_SIZE],     // Salt used for key derivation
-    pub nonce: [u8; NONCE_SIZE],   // Nonce used for encryption
-    pub log_n: u8,                 // Scrypt log_n parameter used
+    pub salt: [u8; SALT_SIZE],   // Salt used for key derivation
+    pub nonce: [u8; NONCE_SIZE], // Nonce used for encryption
+    pub log_n: u8,               // Scrypt log_n parameter used
 }
 
 // user has option to use master password or not
-fn derive_key<P>(password: Option<P>, salt: &[u8; SALT_SIZE], log_n: u8) -> Result<[u8; KEY_SIZE], Error>
+fn derive_key<P>(
+    password: Option<P>,
+    salt: &[u8; SALT_SIZE],
+    log_n: u8,
+) -> Result<[u8; KEY_SIZE], Error>
 where
     P: AsRef<[u8]>,
 {
@@ -183,7 +189,7 @@ where
         ciphertext,
         salt,
         nonce: nonce_bytes,
-        log_n
+        log_n,
     })
 }
 
@@ -220,19 +226,23 @@ where
     Ok(decrypted_bytes)
 }
 
-
 /// Convenience function to decrypt data from String and convert it to a String.
 pub fn decrypt_from_string<P>(
-    encrypted_key: &str,
+    encrypted_base64: &str,
     master_password: Option<P>,
 ) -> Result<String, Error>
 where
     P: AsRef<[u8]>,
 {
+    // Decode the base64 string back into bytes
+    let ciphertext = BASE64
+        .decode(encrypted_base64)
+        .map_err(|_| Error::InvalidSecretKeyData("Invalid base64 encoding".to_string()))?;
+
     let nonce_bytes = [0u8; NONCE_SIZE];
     let encrypted_payload = EncryptedPayload {
-        ciphertext: encrypted_key.as_bytes().to_vec(),
-        salt: HARDCODED_SALT, // TODO
+        ciphertext,
+        salt: HARDCODED_SALT,
         nonce: nonce_bytes,
         log_n: SCRYPT_LOG_N,
     };
@@ -287,28 +297,14 @@ impl std::fmt::Debug for SecretKey {
     }
 }
 
-/// Encrypts a `SecretKey` object.
-#[allow(dead_code)] // This is an example function
-pub fn encrypt_secret_key<P>(
-    secret_key: &SecretKey,
-    master_password: Option<P>
-) -> Result<EncryptedPayload, Error>
-where
-    P: AsRef<[u8]>,
-{
-    encrypt_data(secret_key.as_bytes(), master_password)
-}
-
-/// Decrypts data and attempts to reconstruct a `SecretKey`.
-/// This is a more direct analogue to the `to_secret_key` function in your snippet.
-#[allow(dead_code)] // This is an example function
-pub fn to_secret_key_equivalent<P>(
-    encrypted_payload: &EncryptedPayload,
+/// Converts encrypted data to a base64-encoded string for storage or transmission
+pub fn encrypt_to_string<P>(
+    plaintext_data: &[u8],
     master_password: Option<P>,
-) -> Result<SecretKey, Error>
+) -> Result<String, Error>
 where
     P: AsRef<[u8]>,
 {
-    let decrypted_bytes = decrypt_data(encrypted_payload, master_password)?;
-    SecretKey::from_slice(&decrypted_bytes).map_err(|e_str| Error::InvalidSecretKeyData(e_str))
+    let encrypted = encrypt_data(plaintext_data, master_password)?;
+    Ok(BASE64.encode(encrypted.ciphertext))
 }
