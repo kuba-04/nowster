@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::PathBuf;
-use nostr_sdk::hashes::hex::DisplayHex;
 
 pub fn get_or_create_app_dir(dir_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let app_dir = dirs::data_local_dir()
@@ -55,6 +54,5 @@ pub fn find_first_file(dir_path: &str) -> Option<String> {
 pub fn read_key(dir_path: &str, file_name: &str) -> Option<String> {
     let app_dir = dirs::data_local_dir().unwrap().to_string_lossy().to_string();
     let file_data = fs::read_to_string(&format!("{app_dir}{dir_path}{file_name}"));
-    // println!("file_data: {:?}", &file_data);
     Some(file_data.unwrap())
 }

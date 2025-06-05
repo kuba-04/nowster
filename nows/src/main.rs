@@ -1,9 +1,6 @@
 use std::{io};
-use std::str::FromStr;
-use std::time::Duration;
-use nostr_sdk::{Client, Filter, Keys};
-use nostr_sdk::async_utility::tokio;
 use encryption::{decrypt_from_string, encrypt_to_string};
+use nostr::{derive_pubkey, fetch_events};
 use nows::{create_file, find_first_file, get_or_create_app_dir, read_key, AccountFile};
 
 #[tokio::main]
@@ -41,19 +38,7 @@ async fn main() {
             password,
         ).expect("Decryption failed");
 
-    //     nostr
-    //     let keys = Keys::parse(decrypted_key.as_str());
-    //     let keys = Keys::from_str(&decrypted_key);
-    //     let client = Client::new(keys.unwrap());
-    //
-    //     let _ = client.add_relay("wss://relay.damus.io").await;
-    //     client.connect().await;
-    //
-    //     for event in client.fetch_events(Filter::new(), Duration::new(5, 0)).await.unwrap() {
-    //         println!("{:?}", event.content);
-    //     }
-
-
+        fetch_events(decrypted_key.as_str()).await;
     } else {
         // negative path:
         // 1. ask user about his key and password
@@ -65,8 +50,7 @@ async fn main() {
         let mut priv_key = String::new();
         let _ = io::stdin().read_line(&mut priv_key);
         priv_key = priv_key.trim().to_string();
-        let keys = Keys::parse(priv_key.as_str());
-        let pubkey = keys.expect("Failed to parse keys").public_key;
+        let pubkey = derive_pubkey(priv_key.as_str());
 
         println!("You can use password for additional security of key derivation.\nIf you add it, \
     then everytime you run the program, you have to type this password. For no password, press ENTER");
