@@ -1,5 +1,77 @@
-use std::fs;
+use std::{fs, io};
+use std::net::TcpListener;
 use std::path::PathBuf;
+use encryption::{decrypt_from_string, encrypt_to_string};
+use nostr::{derive_pubkey, fetch_events};
+
+pub async fn run() {
+    let app_storage_dir = dirs::data_local_dir()
+        .expect("Could not find local data directory")
+        .to_string_lossy()
+        .to_string();
+
+    // let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    if let Some(key_file) = find_first_file(&format!("{app_storage_dir}/nows/storage/")) {
+        // 0. ask for password if required (Optional)
+        // 1. decrypt the key
+        // 2. load latest 5 notes
+        // 3. hit SPACE to load another 5
+
+        println!("Type your password if required");
+        let mut typed_password = String::new();
+        let _ = io::stdin().read_line(&mut typed_password);
+        typed_password = typed_password.trim().to_string();
+        let mut password = None;
+        if !typed_password.is_empty() {
+            password = Some(typed_password);
+        }
+
+        let encrypted_key = read_key("/nows/storage/", &key_file)
+            .expect("Could not read master password");
+        let decrypted_key = decrypt_from_string(
+            &encrypted_key,
+            password,
+        ).expect("Decryption failed");
+
+        fetch_events(decrypted_key.as_str()).await;
+    } else {
+        println!("GM! what's your private key?");
+        let mut priv_key = String::new();
+        let _ = io::stdin().read_line(&mut priv_key);
+        priv_key = priv_key.trim().to_string();
+        let pubkey = derive_pubkey(priv_key.as_str());
+
+        println!("---");
+        println!("You can use password for additional security of key derivation.\nIf you add it, \
+    then everytime you run the program, you have to type this password. For no password, press ENTER");
+        let mut master_password = String::new();
+        let _ = io::stdin().read_line(&mut master_password);
+        master_password = master_password.trim().to_string();
+
+        println!("---");
+
+        // // Encrypt the user's password
+        println!("Step 1. Encrypting password string...");
+        let encrypted_payload = encrypt_to_string(
+            priv_key.as_bytes(),
+            Some(master_password.as_bytes())
+        ).expect("Encryption failed");
+
+        println!("Encryption successful.");
+
+        println!("---");
+        println!("Step 2. Storing encrypted data...");
+        let storage = get_or_create_app_dir("nows/storage").expect("Failed to create app dir");
+        let _ = create_file(
+            storage,
+            pubkey.to_string().as_str(),
+            AccountFile::new(&encrypted_payload.as_str())
+        );
+
+        fetch_events(priv_key.as_str()).await;
+    }
+}
 
 pub fn get_or_create_app_dir(dir_name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let app_dir = dirs::data_local_dir()
@@ -19,8 +91,6 @@ pub fn create_file(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file_path = app_dir.join(file_name);
     fs::write(&file_path, content.encrypted_key)?;
-
-    println!("Created key file: {}", file_path.display());
     Ok(())
 }
 
