@@ -1,8 +1,7 @@
-use std::{fs, io};
-use std::net::TcpListener;
-use std::path::PathBuf;
 use encryption::{decrypt_from_string, encrypt_to_string};
-use nostr::{derive_pubkey, fetch_events};
+use nostr::{derive_pubkey, run_nostr};
+use std::path::PathBuf;
+use std::{fs, io};
 
 pub async fn run() {
     let app_storage_dir = dirs::data_local_dir()
@@ -10,14 +9,10 @@ pub async fn run() {
         .to_string_lossy()
         .to_string();
 
-    // let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-
     if let Some(key_file) = find_first_file(&format!("{app_storage_dir}/nows/storage/")) {
-        // 0. ask for password if required (Optional)
-        // 1. decrypt the key
-        // 2. load latest 5 notes
-        // 3. hit SPACE to load another 5
-
+        println!("----NowStr----");
+        println!("for more hit Enter");
+        println!("for quit hit 'q'");
         println!("Type your password if required");
         let mut typed_password = String::new();
         let _ = io::stdin().read_line(&mut typed_password);
@@ -34,7 +29,7 @@ pub async fn run() {
             password,
         ).expect("Decryption failed");
 
-        fetch_events(decrypted_key.as_str()).await;
+        run_nostr(decrypted_key).await;
     } else {
         println!("GM! what's your private key?");
         let mut priv_key = String::new();
@@ -69,7 +64,7 @@ pub async fn run() {
             AccountFile::new(&encrypted_payload.as_str())
         );
 
-        fetch_events(priv_key.as_str()).await;
+        run_nostr(priv_key).await;
     }
 }
 
