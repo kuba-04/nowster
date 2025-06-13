@@ -751,6 +751,13 @@ checksum = "f0efe882e02d206d8d279c20eb40e03baf7cb5136a1476dc084a324fbc3ec42d"
 
 [[package]]
 name = "nostr"
+version = "0.1.0"
+dependencies = [
+ "nostr-sdk",
+]
+
+[[package]]
+name = "nostr"
 version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9c1891da0e58e7eb48a1d2cd704a16f39a61bac3564a1426b26621e21073594"
@@ -780,7 +787,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aafe85dc7c039c399796043b76009fa744c3a45ac073a023932f7b7d91b1e7"
 dependencies = [
  "lru",
- "nostr",
+ "nostr 0.42.1",
  "tokio",
 ]
 
@@ -795,7 +802,7 @@ dependencies = [
  "atomic-destructor",
  "lru",
  "negentropy",
- "nostr",
+ "nostr 0.42.1",
  "nostr-database",
  "tokio",
  "tracing",
@@ -808,7 +815,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1e928ba9ac2695fbe10b8aefda59f2abfeb23c10a0e86a0b3e0f6a27bb274a2"
 dependencies = [
  "async-utility",
- "nostr",
+ "nostr 0.42.1",
  "nostr-database",
  "nostr-relay-pool",
  "tokio",
@@ -822,6 +829,7 @@ dependencies = [
  "bincode",
  "dirs",
  "encryption",
+ "nostr 0.1.0",
  "nostr-sdk",
  "tokio",
 ]

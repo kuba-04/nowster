@@ -1,4 +1,4 @@
 [workspace]
 members = [
-    "nows", "encryption"
+    "nows", "encryption", "nostr"
 ]
