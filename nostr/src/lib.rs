@@ -2,6 +2,7 @@ use nostr_sdk::prelude::StreamExt;
 use nostr_sdk::{Client, Filter, Keys, Kind, PublicKey, TagKind, Timestamp};
 use std::io;
 use std::ops::Add;
+use std::process::Command;
 use std::time::Duration;
 
 pub async fn run_nostr(priv_key: Option<String>, pubkey: String) {
@@ -32,6 +33,9 @@ pub async fn run_nostr(priv_key: Option<String>, pubkey: String) {
 
         if command.trim().is_empty() || command.trim_end_matches(&['\r', '\n'][..]).is_empty() {
             until = fetch_events(&client, follow_list.clone(), Some(until)).await;
+        } else if command.trim().eq_ignore_ascii_case("r") {
+            Command::new("clear").status().expect("Failed to execute command");
+            until = fetch_events(&client, follow_list.clone(), None).await;
         } else if command.trim().eq_ignore_ascii_case("q") {
             println!("bye!");
             break;
@@ -47,16 +51,21 @@ async fn fetch_events(client: &Client, authors: Vec<PublicKey>, until: Option<Ti
     if let Some(ts) = until {
         filter = filter.clone().until(ts.add(Duration::from_nanos(1)));
     }
+    // todo look into stream_events to not stream old events
     let mut stream = client.stream_events(filter, Duration::from_secs(5)).await.unwrap();
 
     let mut last_event_ts = Timestamp::now();
 
     while let Some(event) = stream.next().await {
         last_event_ts = event.created_at;
+        println!("{:?}", last_event_ts.to_human_datetime());
         println!("{}", event.content);
+        println!();
+        println!("-------");
         println!("by -> {}", event.pubkey);
         println!("link -> https://primal.net/e/{}", event.id);
-        println!("-------------");
+        println!("=======");
+        println!();
         println!();
     }
     last_event_ts

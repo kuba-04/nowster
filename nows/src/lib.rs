@@ -5,8 +5,12 @@ use std::{fs, io};
 
 pub async fn run() {
     println!("----NowStr----");
-    println!("for more hit Enter");
-    println!("for quit hit 'q'");
+    println!();
+    println!("Instructions:");
+    println!("- for more hit Enter");
+    println!("- for refresh(up) hit 'r'");
+    println!("- for quit hit 'q'");
+    println!();
 
     let app_storage_dir = dirs::data_local_dir()
         .expect("Could not find local data directory")

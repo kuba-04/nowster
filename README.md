@@ -6,6 +6,8 @@ WIP: basically I am coding this for fun and get familiar with some libs like [ru
 
 todo:
 - [x] fetch my followers events only
+- [ ] r for refresh and go up
 - [ ] improve the look
 - [ ] init setup (when no key in store) relay select etc.
-- [ ] r for refresh and go up
+- [ ] b {id} open in browser (p {id} )
+- [ ] p {id} -> fetch name
